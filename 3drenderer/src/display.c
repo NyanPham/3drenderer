@@ -1,5 +1,7 @@
 #include "display.h"
 
+#include <math.h>
+
 SDL_Window* g_window = NULL;
 SDL_Renderer* g_renderer = NULL;
 
@@ -70,6 +72,35 @@ void draw_rect(int x, int y, int w, int h, uint32_t color) {
             draw_pixel(x + i, y + j, color);
         }
     }
+}
+
+void draw_line(int x0, int y0, int x1, int y1, uint32_t color) {
+    int delta_x = x1 - x0;
+    int delta_y = y1 - y0;
+
+    int side_length = abs(delta_x) > abs(delta_y) ? abs(delta_x) : abs(delta_y);
+
+    float x_inc = delta_x / (float)side_length;
+    float y_inc = delta_y / (float)side_length;
+
+    float curr_x = x0;
+    float curr_y = y0;
+
+    for (int i = 0; i < side_length; i++) {
+        draw_pixel(curr_x, curr_y, color); 
+        curr_x += x_inc;
+        curr_y += y_inc;
+    }
+}
+
+void draw_triangle(triangle_t *triangle, uint32_t color) {
+    draw_rect(triangle->points[0].x, triangle->points[0].y, 3, 3, color);        
+    draw_rect(triangle->points[1].x, triangle->points[1].y, 3, 3, color);        
+    draw_rect(triangle->points[2].x, triangle->points[2].y, 3, 3, color);
+
+    draw_line(triangle->points[0].x, triangle->points[0].y, triangle->points[1].x, triangle->points[1].y, color);
+    draw_line(triangle->points[1].x, triangle->points[1].y, triangle->points[2].x, triangle->points[2].y, color);
+    draw_line(triangle->points[2].x, triangle->points[2].y, triangle->points[0].x, triangle->points[0].y, color);
 }
 
 void clear_color_buffer(uint32_t color) {
