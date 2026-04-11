@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <SDL2/SDL.h>
+#include <math.h>
 #include "array.h"
 #include "display.h"
 #include "vector.h"
@@ -11,7 +12,7 @@
 triangle_t* triangles_to_render = NULL;
 
 vec3_t camera_position = { 0, 0, 0 };
-float fov_factor = 640;
+mat4_t proj_matrix;
 
 uint8_t is_running = 0;
 int previous_frame_time = 0;
@@ -43,6 +44,13 @@ void setup(void) {
         window_width,
         window_height
     );
+
+    // init the perspective projection matrix
+    float fov = 1.047197;
+    float aspect = (float)window_height / (float)window_width;
+    float znear = 0.1;
+    float zfar = 100.0;
+    proj_matrix = mat4_make_perspective(fov, aspect, znear, zfar);
 
     load_cube_mesh_data();
     // load_obj_file_data("./assets/cube.obj");
@@ -85,6 +93,7 @@ void process_input(void) {
     }
 }
 
+/*
 // Receives a 3d vector and returns a projected 2d point
 vec2_t project(vec3_t point) {
     vec2_t projected_point = {
@@ -94,6 +103,7 @@ vec2_t project(vec3_t point) {
 
     return projected_point;
 }
+*/
 
 void update(void) {
     int time_to_wait = FRAME_TARGET_TIME - (SDL_GetTicks() - previous_frame_time);
@@ -108,11 +118,11 @@ void update(void) {
     triangles_to_render = NULL;
 
     mesh.rotation.x += 0.01;
-    mesh.rotation.y += 0.01;
-    mesh.rotation.z += 0.01;
+    //mesh.rotation.y += 0.01;
+    //mesh.rotation.z += 0.01;
     //mesh.scale.x += 0.002;
     //mesh.scale.y += 0.001;
-    mesh.translation.x += 0.01;
+    //mesh.translation.x += 0.01;
     mesh.translation.z = 5;
 
     mat4_t scale_matrix = mat4_make_scale(mesh.scale.x, mesh.scale.y, mesh.scale.z);
@@ -175,15 +185,20 @@ void update(void) {
             }
         }    
         
-        vec2_t projected_points[3];
+        vec4_t projected_points[3];
 
         // loop all 3 vertices to perform projection
         for (int j = 0; j < 3; j++) {
-            projected_points[j] = project(vec3_from_vec4(transformed_vertices[j]));
+            projected_points[j] = mat4_mul_vec4_project(proj_matrix, transformed_vertices[j]); 
             
-            // scale and translate the projected points to the middle of the screen
-            projected_points[j].x += (window_width / 2);
-            projected_points[j].y += (window_height / 2);
+            // scale the points into the view
+            projected_points[j].x *= window_width / 2.0;
+            projected_points[j].y *= window_height / 2.0;
+            
+            // translate the projected points to the middle of the screen
+            projected_points[j].x += (window_width / 2.0);
+            projected_points[j].y += (window_height / 2.0);
+            
         }
         
         // compute the avg_depth for each face based on vertices after transformation
