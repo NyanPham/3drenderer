@@ -72,9 +72,22 @@ void load_obj_file_data(const char* filename) {
 
     char line_buf[MAX_LINES];
 
+    tex2_t* texcoords = NULL;
+
     while (fgets(line_buf, sizeof(line_buf), file) != NULL) {
         switch (line_buf[0]) {
             case 'v':
+                if (line_buf[1] == 't') {
+                    tex2_t texcoord;
+                    if(sscanf(line_buf, "vt %f %f", &texcoord.u, &texcoord.v) == 2) {
+                        array_push(texcoords, texcoord);
+                    } else {
+                        fprintf(stderr, "Not valid vt line\n");
+                        return;
+                    }
+                    break;
+                }
+
                 if (line_buf[1] != ' ') break;
                 vec3_t vertex;
                 if (sscanf(line_buf, "v %f %f %f", &vertex.x, &vertex.y, &vertex.z) == 3) {
@@ -89,19 +102,17 @@ void load_obj_file_data(const char* filename) {
                 int texture_indices[3];
                 int normal_indices[3];
                 if (sscanf(line_buf, "f %d/%d/%d %d/%d/%d %d/%d/%d", 
-                    &vertex_indices[0], 
-                    &texture_indices[0], 
-                    &normal_indices[0], 
-                    &vertex_indices[1], 
-                    &texture_indices[1], 
-                    &normal_indices[1], 
-                    &vertex_indices[2], 
-                    &texture_indices[2], 
-                    &normal_indices[2]) == 9) {
+                    &vertex_indices[0], &texture_indices[0], &normal_indices[0], 
+                    &vertex_indices[1], &texture_indices[1], &normal_indices[1], 
+                    &vertex_indices[2], &texture_indices[2], &normal_indices[2]
+                ) == 9) {
                     face_t face = {
-                        .a = vertex_indices[0],
-                        .b = vertex_indices[1],
-                        .c = vertex_indices[2],
+                        .a = vertex_indices[0] - 1,
+                        .b = vertex_indices[1] - 1,
+                        .c = vertex_indices[2] - 1,
+                        .a_uv = texcoords[texture_indices[0] - 1],
+                        .b_uv = texcoords[texture_indices[1] - 1],
+                        .c_uv = texcoords[texture_indices[2] - 1],
                         .color = 0xFFFFFFFF,
                     };
                     array_push(mesh.faces, face);
@@ -115,4 +126,6 @@ void load_obj_file_data(const char* filename) {
 
         }
     }
+
+    array_free(texcoords);
 }

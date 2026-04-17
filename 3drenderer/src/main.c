@@ -57,11 +57,11 @@ void setup(void) {
     float zfar = 100.0;
     proj_matrix = mat4_make_perspective(fov, aspect, znear, zfar);
 
-    load_cube_mesh_data();
-    //load_obj_file_data("./assets/cube.obj");
+    //load_cube_mesh_data();
+    load_obj_file_data("./assets/drone.obj");
         
     // load texture info from an external png file
-    load_png_texture_data("./assets/cube.png");
+    load_png_texture_data("./assets/drone.png");
 }
 
 void process_input(void) {
@@ -131,7 +131,7 @@ void update(void) {
     // initialize the array of triangles to render
     triangles_to_render = NULL;
 
-    //mesh.rotation.x += 0.008;
+    //mesh.rotation.x = -0.008;
     mesh.rotation.y += 0.003;
     //mesh.rotation.z += 0.000;
     mesh.translation.z = 5;
@@ -150,9 +150,9 @@ void update(void) {
         face_t mesh_face = mesh.faces[i];
         
         vec3_t face_vertices[3];
-        face_vertices[0] = mesh.vertices[mesh_face.a - 1];
-        face_vertices[1] = mesh.vertices[mesh_face.b - 1];
-        face_vertices[2] = mesh.vertices[mesh_face.c - 1];
+        face_vertices[0] = mesh.vertices[mesh_face.a];
+        face_vertices[1] = mesh.vertices[mesh_face.b];
+        face_vertices[2] = mesh.vertices[mesh_face.c];
        
         vec4_t transformed_vertices[3];
             
