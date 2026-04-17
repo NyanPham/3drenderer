@@ -31,15 +31,8 @@ void fill_flat_top_triangle(int x0, int y0, int x1, int y1, int x2, int y2, uint
     }
 }
 
-void draw_filled_triangle(triangle_t* t, uint32_t color) {
+void draw_filled_triangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
     // we need to sort the vertices by y-coordinate ascending (y0 < y1 < y2)
-    int x0 = t->points[0].x;
-    int y0 = t->points[0].y;
-    int x1 = t->points[1].x;
-    int y1 = t->points[1].y;
-    int x2 = t->points[2].x;
-    int y2 = t->points[2].y;
-
 
     if (y0 > y1) {
         int_swap(&y0, &y1);
@@ -77,10 +70,10 @@ void draw_filled_triangle(triangle_t* t, uint32_t color) {
     fill_flat_top_triangle(x1, y1, Mx, My, x2, y2, color);
 }
 
-void draw_triangle(triangle_t *triangle, uint32_t color) {
-    draw_line(triangle->points[0].x, triangle->points[0].y, triangle->points[1].x, triangle->points[1].y, color);
-    draw_line(triangle->points[1].x, triangle->points[1].y, triangle->points[2].x, triangle->points[2].y, color);
-    draw_line(triangle->points[2].x, triangle->points[2].y, triangle->points[0].x, triangle->points[0].y, color);
+void draw_triangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
+    draw_line(x0, y0, x1, y1, color);
+    draw_line(x1, y1, x2, y2, color);
+    draw_line(x2, y2, x0, y0, color);
 }
 
 vec3_t barycentric_weights(vec2_t a, vec2_t b, vec2_t c, vec2_t p) {
@@ -103,18 +96,30 @@ vec3_t barycentric_weights(vec2_t a, vec2_t b, vec2_t c, vec2_t p) {
 
 void draw_texel(
         int x, int y, uint32_t* texture, 
-        vec2_t point_a, vec2_t point_b, vec2_t point_c,
-        float u0, float v0, float u1, float v1, float u2, float v2
+        vec4_t point_a, vec4_t point_b, vec4_t point_c,
+        tex2_t a_uv, tex2_t b_uv, tex2_t c_uv
 ) {
     vec2_t point_p = { x, y };
-    vec3_t weights = barycentric_weights(point_a, point_b, point_c, point_p); 
+    vec2_t a = vec2_from_vec4(point_a);
+    vec2_t b = vec2_from_vec4(point_b);
+    vec2_t c = vec2_from_vec4(point_c);
+
+    vec3_t weights = barycentric_weights(a, b, c, point_p); 
     
     float alpha = weights.x;
     float beta = weights.y;
     float gama = weights.z;
 
-    float interpolated_u = u0 * alpha + u1 * beta + u2 * gama;
-    float interpolated_v = v0 * alpha + v1 * beta + v2 * gama;
+    float interpolated_u;
+    float interpolated_v;
+    float interpolated_reciprocal_w;
+
+    interpolated_u = (a_uv.u / point_a.w) * alpha + (b_uv.u / point_b.w) * beta + (c_uv.u / point_c.w) * gama;
+    interpolated_v = (a_uv.v / point_a.w) * alpha + (b_uv.v / point_b.w) * beta + (c_uv.v / point_c.w) * gama;
+    interpolated_reciprocal_w = (1 / point_a.w) * alpha + (1 / point_b.w) * beta + (1 / point_c.w) * gama;
+    
+    interpolated_u /= interpolated_reciprocal_w;
+    interpolated_v /= interpolated_reciprocal_w;
 
     int tex_x = abs((int)(interpolated_u * texture_width));
     int tex_y = abs((int)(interpolated_v * texture_height));
@@ -123,26 +128,18 @@ void draw_texel(
     draw_pixel(x, y, texture[tex_y * texture_width + tex_x]);
 }
 
-void draw_textured_triangle(triangle_t* t, uint32_t* texture) {
-    int x0 = t->points[0].x;
-    int y0 = t->points[0].y;
-    float u0 = t->texcoords[0].u;
-    float v0 = t->texcoords[0].v;
-
-    int x1 = t->points[1].x;
-    int y1 = t->points[1].y;
-    float u1 = t->texcoords[1].u;
-    float v1 = t->texcoords[1].v;
-    
-    int x2 = t->points[2].x;
-    int y2 = t->points[2].y;
-    float u2 = t->texcoords[2].u;
-    float v2 = t->texcoords[2].v;
-
+void draw_textured_triangle(
+        int x0, int y0, float z0, float w0, float u0, float v0, 
+        int x1, int y1, float z1, float w1, float u1, float v1, 
+        int x2, int y2, float z2, float w2, float u2, float v2, 
+        uint32_t* texture
+) {
     // sort the vertices by the y-coordinate ascending (y0 < y1 < y2)
     if (y0 > y1) {
         int_swap(&y0, &y1);
         int_swap(&x0, &x1);
+        float_swap(&z0, &z1);
+        float_swap(&w0, &w1);
         float_swap(&u0, &u1);
         float_swap(&v0, &v1);
     }
@@ -150,6 +147,8 @@ void draw_textured_triangle(triangle_t* t, uint32_t* texture) {
     if (y1 > y2) {
         int_swap(&y1, &y2);
         int_swap(&x1, &x2);
+        float_swap(&z1, &z2);
+        float_swap(&w1, &w2);
         float_swap(&u1, &u2);
         float_swap(&v1, &v2);
     }
@@ -157,14 +156,19 @@ void draw_textured_triangle(triangle_t* t, uint32_t* texture) {
     if (y0 > y1) {
         int_swap(&y0, &y1);
         int_swap(&x0, &x1);
+        float_swap(&z0, &z1);
+        float_swap(&w0, &w1);
         float_swap(&u0, &u1);
         float_swap(&v0, &v1);
     }
     
-    // create vector points after sorting the vertices
-    vec2_t point_a = { x0, y0 };
-    vec2_t point_b = { x1, y1 };
-    vec2_t point_c = { x2, y2 };
+    // create vector points and texture coords after sorting the vertices
+    vec4_t point_a = { x0, y0, z0, w0 };
+    vec4_t point_b = { x1, y1, x1, w1 };
+    vec4_t point_c = { x2, y2, z2, w2 };
+    tex2_t a_uv = { u0, v0 };
+    tex2_t b_uv = { u1, v1 };
+    tex2_t c_uv = { u2, v2 };
 
     // render the upper part of the triangle (flat-bottom)
     float inv_slope1 = 0;
@@ -188,7 +192,7 @@ void draw_textured_triangle(triangle_t* t, uint32_t* texture) {
             }
 
             for (int x = x_start; x < x_end; x++) {
-                draw_texel(x, y, texture, point_a, point_b, point_c, u0, v0, u1, v1, u2, v2);                  
+                draw_texel(x, y, texture, point_a, point_b, point_c, a_uv, b_uv, c_uv);                  
             }
         }
     }
@@ -215,7 +219,7 @@ void draw_textured_triangle(triangle_t* t, uint32_t* texture) {
             }
 
             for (int x = x_start; x < x_end; x++) {
-                draw_texel(x, y, texture, point_a, point_b, point_c, u0, v0, u1, v1, u2, v2);                  
+                draw_texel(x, y, texture, point_a, point_b, point_c, a_uv, b_uv, c_uv);                  
             }
         }
     }

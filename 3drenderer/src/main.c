@@ -132,12 +132,9 @@ void update(void) {
     // initialize the array of triangles to render
     triangles_to_render = NULL;
 
-    mesh.rotation.x += 0.008;
-    mesh.rotation.y += 0.003;
-    mesh.rotation.z += 0.004;
-    //mesh.scale.x += 0.002;
-    //mesh.scale.y += 0.001;
-    //mesh.translation.x += 0.01;
+    //mesh.rotation.x += 0.008;
+    //mesh.rotation.y += 0.003;
+    //mesh.rotation.z += 0.000;
     mesh.translation.z = 5;
 
     mat4_t scale_matrix = mat4_make_scale(mesh.scale.x, mesh.scale.y, mesh.scale.z);
@@ -227,9 +224,9 @@ void update(void) {
 
         triangle_t projected_triangle = {
             .points = {
-                { projected_points[0].x, projected_points[0].y },
-                { projected_points[1].x, projected_points[1].y },
-                { projected_points[2].x, projected_points[2].y },
+                { projected_points[0].x, projected_points[0].y, projected_points[0].z, projected_points[0].w },
+                { projected_points[1].x, projected_points[1].y, projected_points[1].z, projected_points[1].w },
+                { projected_points[2].x, projected_points[2].y, projected_points[2].z, projected_points[2].w },
             },
             .texcoords = {
                 { mesh_face.a_uv.u, mesh_face.a_uv.v },
@@ -272,15 +269,27 @@ void render(void) {
         triangle_t triangle = triangles_to_render[i];
         
         if (render_method == RENDER_FILL_TRIANGLE || render_method == RENDER_FILL_TRIANGLE_WIRE) {
-            draw_filled_triangle(&triangle, triangle.color);
+            draw_filled_triangle(
+                    triangle.points[0].x, triangle.points[0].y,
+                    triangle.points[1].x, triangle.points[1].y,
+                    triangle.points[2].x, triangle.points[2].y,
+                    triangle.color);
         }
         
         if (render_method == RENDER_TEXTURE || render_method == RENDER_TEXTURE_WIRE) {
-            draw_textured_triangle(&triangle, mesh_texture);
+            draw_textured_triangle(
+                    triangle.points[0].x, triangle.points[0].y, triangle.points[0].z, triangle.points[0].w, triangle.texcoords[0].u, triangle.texcoords[0].v, 
+                    triangle.points[1].x, triangle.points[1].y, triangle.points[1].z, triangle.points[1].w, triangle.texcoords[1].u, triangle.texcoords[1].v, 
+                    triangle.points[2].x, triangle.points[2].y, triangle.points[2].z, triangle.points[2].w, triangle.texcoords[2].u, triangle.texcoords[2].v, 
+                    mesh_texture);
         }
 
         if (render_method == RENDER_WIRE || render_method == RENDER_WIRE_VERTEX || render_method == RENDER_FILL_TRIANGLE_WIRE || render_method == RENDER_TEXTURE_WIRE) {
-            draw_triangle(&triangle, 0xFFFFFFFF);
+            draw_triangle(
+                    triangle.points[0].x, triangle.points[0].y,
+                    triangle.points[1].x, triangle.points[1].y,
+                    triangle.points[2].x, triangle.points[2].y,
+                    0xFFFFFFFF);
         }
                     
         if (render_method == RENDER_WIRE_VERTEX) {
