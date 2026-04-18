@@ -12,6 +12,7 @@
 extern SDL_Window* g_window;
 extern SDL_Renderer* g_renderer;
 extern uint32_t* g_color_buffer;
+extern float* z_buffer;
 extern SDL_Texture * g_color_buffer_texture;
 extern int window_width;
 extern int window_height;
@@ -23,6 +24,7 @@ void draw_rect(int x, int y, int w, int h, uint32_t color);
 void draw_line(int x0, int y0, int x1, int y1, uint32_t color);
 void render_color_buffer(void);
 void clear_color_buffer(uint32_t color);
+void clear_z_buffer(void);
 void destroy_window(void);
 
 #endif
