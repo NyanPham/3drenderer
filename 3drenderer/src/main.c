@@ -11,16 +11,20 @@
 #include "matrix.h"
 #include "light.h"
 #include "texture.h"
+#include "camera.h"
 
 #define MAX_TRIANGLES_PER_MESH 10000
 triangle_t triangles_to_render[MAX_TRIANGLES_PER_MESH];
 int num_triangles_to_render = 0;
 
-vec3_t camera_position = { 0, 0, 0 };
+mat4_t world_matrix;
 mat4_t proj_matrix;
+mat4_t view_matrix;
+
 
 uint8_t is_running = 0;
 int previous_frame_time = 0;
+float delta_time = 0.0;
 
 enum cull_method {
     CULL_NONE,
@@ -61,15 +65,14 @@ void setup(void) {
     proj_matrix = mat4_make_perspective(fov, aspect, znear, zfar);
 
     //load_cube_mesh_data();
-    load_obj_file_data("./assets/drone.obj");
+    load_obj_file_data("./assets/f117.obj");
         
     // load texture info from an external png file
-    load_png_texture_data("./assets/drone.png");
+    load_png_texture_data("./assets/f117.png");
 }
 
 void process_input(void) {
     SDL_Event event;
-
     SDL_PollEvent(&event);
     
     switch(event.type) {
@@ -101,8 +104,28 @@ void process_input(void) {
             if (event.key.keysym.sym == SDLK_c) {
                 cull_method = CULL_BACKFACE;
             } 
-            if (event.key.keysym.sym == SDLK_d) {
+            if (event.key.keysym.sym == SDLK_x) {
                 cull_method = CULL_NONE;
+            }
+            if (event.key.keysym.sym == SDLK_UP) {
+                camera.position.y += 3.0 * delta_time;
+            }
+            if (event.key.keysym.sym == SDLK_DOWN) {
+                camera.position.y -= 3.0 * delta_time;
+            }
+            if (event.key.keysym.sym == SDLK_a) {
+                camera.yaw += 1.0 * delta_time;
+            }
+            if (event.key.keysym.sym == SDLK_d) {
+                camera.yaw -= 1.0 * delta_time;
+            } 
+            if (event.key.keysym.sym == SDLK_w) {
+                camera.forward_velocity = vec3_mul(camera.direction, 5.0 * delta_time); 
+                camera.position = vec3_add(camera.position, camera.forward_velocity);
+            }
+            if (event.key.keysym.sym == SDLK_s) {
+                camera.forward_velocity = vec3_mul(camera.direction, 5.0 * delta_time); 
+                camera.position = vec3_sub(camera.position, camera.forward_velocity);
             }
             break;
         default:
@@ -129,17 +152,30 @@ void update(void) {
         SDL_Delay(time_to_wait);
     } 
     
-    float delta_time = (SDL_GetTicks() - previous_frame_time) / 1000.0f;
+    delta_time = (SDL_GetTicks() - previous_frame_time) / 1000.0f;
     previous_frame_time = SDL_GetTicks();
     
     // initialize the counter of triangles to render for the current frame
     num_triangles_to_render = 0;
 
     mesh.rotation.x += 0.0 * delta_time;
-    mesh.rotation.y += 0.8 * delta_time;
+    mesh.rotation.y += 0.0 * delta_time;
     mesh.rotation.z += 0.0 * delta_time;
-    mesh.translation.z = 5;
+    mesh.translation.z = 5.0;
 
+    // initialize the target
+    vec3_t target = { 0, 0, 1 };
+    mat4_t camera_yaw_rotation = mat4_make_rotation_y(camera.yaw);
+    camera.direction = vec3_from_vec4(mat4_mul_vec4(camera_yaw_rotation, vec4_from_vec3(target)));
+    
+    // offset the camera position in the direction 
+    target = vec3_add(camera.position, camera.direction);
+    vec3_t up_dir = { 0, 1, 0 };
+    
+    // create a view matrix
+    view_matrix = mat4_look_at(camera.position, target, up_dir);
+
+    // create a scale, rotation, and translation matrix to multiply the vertices
     mat4_t scale_matrix = mat4_make_scale(mesh.scale.x, mesh.scale.y, mesh.scale.z);
     mat4_t trans_matrix = mat4_make_translation(mesh.translation.x, mesh.translation.y, mesh.translation.z);
     mat4_t rotation_matrix_z = mat4_make_rotation_z(mesh.rotation.z);
@@ -164,7 +200,7 @@ void update(void) {
         for (int j = 0; j < 3; j++) {
             vec4_t transformed_vertex = vec4_from_vec3(face_vertices[j]);
 
-            mat4_t world_matrix = mat4_identity();
+            world_matrix = mat4_identity();
 
             // order of transformation: scale -> rotate -> translate. [T]*[R]*[S]*v
             world_matrix = mat4_mul_mat4(scale_matrix, world_matrix);
@@ -174,10 +210,10 @@ void update(void) {
             world_matrix = mat4_mul_mat4(trans_matrix, world_matrix);
 
             transformed_vertex = mat4_mul_vec4(world_matrix, transformed_vertex);
+            transformed_vertex = mat4_mul_vec4(view_matrix, transformed_vertex);
 
             transformed_vertices[j] = transformed_vertex;
         }
-   
         vec3_t vertex_a = vec3_from_vec4(transformed_vertices[0]);
         vec3_t vertex_b = vec3_from_vec4(transformed_vertices[1]);
         vec3_t vertex_c = vec3_from_vec4(transformed_vertices[2]);
@@ -190,11 +226,13 @@ void update(void) {
         vec3_t normal = vec3_cross(vector_ab, vector_ac);
         vec3_normalize(&normal);
 
+        vec3_t origin = { 0, 0, 0 };
+        vec3_t camera_ray = vec3_sub(origin, vertex_a);
+
+        float dot_normal_camera = vec3_dot(camera_ray, normal);
+
         // check backface culling
         if (cull_method == CULL_BACKFACE) {
-            vec3_t camera_ray = vec3_sub(camera_position, vertex_a);
-            float dot_normal_camera = vec3_dot(camera_ray, normal);
-
             if (dot_normal_camera < 0) {
                 continue;
             }
